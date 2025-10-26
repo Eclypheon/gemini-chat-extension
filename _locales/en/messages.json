@@ -42,5 +42,9 @@
   "enableChatOutlineLabel": {
     "message": "Enable Chat Outline",
     "description": "Label for the toggle switch in the popup for the chat outline feature."
+  },
+  "tagTooltip": {
+    "message": "Tag this chat for organization",
+    "description": "Tooltip for the tagging icon."
   }
 }

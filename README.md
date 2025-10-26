@@ -6,9 +6,9 @@
   </a>
 </div>
 
-# Chat Outline - A Chrome Extension for Gemini
+# Chat Outline - A Firefox Extension for Gemini
 
-This is a simple Chrome extension that adds a clickable outline to your [Gemini](https://gemini.google.com) chat history, making it easier to navigate long conversations.
+This is a simple Firefox extension that adds a clickable outline to your [Gemini](https://gemini.google.com) chat history, making it easier to navigate long conversations.
 
 ## Features
 
@@ -19,21 +19,18 @@ This is a simple Chrome extension that adds a clickable outline to your [Gemini]
 -   **Minimalist UI**: The outline is accessible via a simple icon and can be opened or closed.
 -   **Light & Dark Theme**: Automatically adapts to the Gemini website's theme.
 
-## Install from Chrome Web Store
+## Install from Mozilla Add-ons
 
-You can install the extension directly from the Chrome Web Store:
-
-[**Add to Chrome**](https://chromewebstore.google.com/detail/ihakfpnmefdkllhkecanagmienfnmojn?utm_source=item-share-cb)
+You can download and install the extension directly from [Mozilla Add-ons](https://addons.mozilla.org/).
 
 ## How to Install (from source)
 
 1.  Clone or download this repository.
-2.  Open Google Chrome and navigate to `chrome://extensions`.
-3.  Enable **Developer mode** using the toggle in the top-right corner.
-4.  Click the **Load unpacked** button.
-5.  Select the directory where you cloned or downloaded this repository.
+2.  Open Firefox and navigate to `about:debugging#/runtime/this-firefox`.
+3.  Click **Load Temporary Add-on**.
+4.  Select the `manifest.json` file in this directory.
 
-The extension's icon will now appear in the top-left corner of the Gemini chat window.
+The extension's icon will now appear in the toolbar of the Gemini chat window.
 
 ---
 
