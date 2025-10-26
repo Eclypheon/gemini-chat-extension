@@ -18,6 +18,8 @@ This is a simple Firefox extension that adds a clickable outline to your [Gemini
 -   **Quick-Quote**: Quickly quote a specific part of a message to ask a follow-up question.
 -   **Minimalist UI**: The outline is accessible via a simple icon and can be opened or closed.
 -   **Light & Dark Theme**: Automatically adapts to the Gemini website's theme.
+-   **Chat Tagging System**: Organize and manage your chats with custom tags.
+-   **Interactive Tag Management**: Add, remove, and rename tags directly from the interface with intuitive buttons (green '+' to add, red '×' to remove, pencil '✏️' to rename).
 
 ## Install from Mozilla Add-ons
 
