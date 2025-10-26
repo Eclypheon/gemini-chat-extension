@@ -157,7 +157,7 @@ function showTagPopover(chatWindow) {
   if (!popover) {
     popover = document.createElement('div');
     popover.id = 'gemini-tag-popover';
-    popover.innerHTML = '<div><input type="text" placeholder="tag1, tag2, tag3" value=""><div class="tag-buttons"><button id="save-tags">Save</button><button id="cancel-tags">Cancel</button></div></div>';
+    popover.innerHTML = '<div><input type="text" placeholder="tag1, tag2, tag3" value=""><div class="tag-buttons"><button id="save-tags">Save</button><button id="cancel-tags">Cancel</button></div><div id="tags-list"></div></div>';
     chatWindow.appendChild(popover);
   } else {
     popover.classList.remove('hidden');
@@ -165,28 +165,80 @@ function showTagPopover(chatWindow) {
 
   // Get current chat ID
   const chatId = location.pathname.split('/').pop();
-  chrome.storage.sync.get('chatTags', (data) => {
-    const chatTags = data.chatTags || {};
-    const currentTags = chatTags[chatId] || [];
-    const input = popover.querySelector('input');
-    if (input) input.value = currentTags.join(', ');
 
-    const saveBtn = popover.querySelector('#save-tags');
-    if (saveBtn) {
-      saveBtn.onclick = () => {
-        const newTags = input.value.split(',').map(t => t.trim()).filter(t => t);
-        chatTags[chatId] = newTags;
-        chrome.storage.sync.set({ chatTags }, () => {
-          hideTagPopover();
+  function updatePopover() {
+    chrome.storage.sync.get('chatTags', (data) => {
+      const chatTags = data.chatTags || {};
+      const currentTags = chatTags[chatId] || [];
+      const input = popover.querySelector('input');
+      if (input) input.value = currentTags.join(', ');
+
+      const saveBtn = popover.querySelector('#save-tags');
+      if (saveBtn) {
+        saveBtn.onclick = () => {
+          const newTags = input.value.split(',').map(t => t.trim()).filter(t => t);
+          chatTags[chatId] = newTags;
+          chrome.storage.sync.set({ chatTags }, () => {
+            updatePopover();
+          });
+        };
+      }
+
+      const cancelBtn = popover.querySelector('#cancel-tags');
+      if (cancelBtn) {
+        cancelBtn.onclick = updatePopover; // Re-render instead of hide
+      }
+
+      // Now list all unique tags
+      const tagsListDiv = popover.querySelector('#tags-list');
+      if (tagsListDiv) {
+        tagsListDiv.innerHTML = '';
+
+        // Get unique tags
+        const allTags = new Set();
+        for (const chats in chatTags) {
+          chatTags[chats].forEach(tag => allTags.add(tag));
+        }
+
+        const uniqueTags = Array.from(allTags);
+        if (uniqueTags.length === 0) {
+          tagsListDiv.textContent = 'No tagged chats yet.';
+          return;
+        }
+
+        uniqueTags.forEach(tag => {
+          const tagDiv = document.createElement('div');
+          tagDiv.className = 'tag-item';
+          tagDiv.textContent = tag;
+          tagDiv.onclick = () => {
+            // Toggle show chats
+            if (tagDiv.classList.contains('expanded')) {
+              tagDiv.classList.remove('expanded');
+              const existingList = tagDiv.querySelector('.chat-list');
+              if (existingList) existingList.remove();
+            } else {
+              tagDiv.classList.add('expanded');
+              const chatListDiv = document.createElement('div');
+              chatListDiv.className = 'chat-list';
+              // Find chats with this tag
+              for (const cId in chatTags) {
+                if (chatTags[cId].includes(tag)) {
+                  const chatSpan = document.createElement('div');
+                  chatSpan.className = 'chat-item';
+                  chatSpan.textContent = `Chat: ${cId}`;
+                  chatListDiv.appendChild(chatSpan);
+                }
+              }
+              tagDiv.appendChild(chatListDiv);
+            }
+          };
+          tagsListDiv.appendChild(tagDiv);
         });
-      };
-    }
+      }
+    });
+  }
 
-    const cancelBtn = popover.querySelector('#cancel-tags');
-    if (cancelBtn) {
-      cancelBtn.onclick = hideTagPopover;
-    }
-  });
+  updatePopover();
 }
 
 function hideTagPopover() {

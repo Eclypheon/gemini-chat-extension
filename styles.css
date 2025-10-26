@@ -163,6 +163,36 @@ body.dark-theme, :root[theme=dark] {
   background-color: var(--toc-bg-color);
 }
 
+#gemini-tag-popover #tags-list, #gemini-tag-popover #tags-list .tag-item {
+  margin-top: 8px;
+}
+
+#gemini-tag-popover #tags-list .tag-item {
+  padding: 4px 8px;
+  margin-bottom: 4px;
+  cursor: pointer;
+  border-radius: 4px;
+  background-color: var(--toc-hover-bg);
+  color: var(--toc-text-color);
+}
+
+#gemini-tag-popover #tags-list .tag-item:hover {
+  background-color: var(--toc-bg-color);
+}
+
+#gemini-tag-popover #tags-list .tag-item .chat-list {
+  margin-left: 8px;
+  margin-top: 4px;
+}
+
+#gemini-tag-popover #tags-list .tag-item .chat-item {
+  padding: 2px 4px;
+  margin-bottom: 2px;
+  background-color: var(--toc-hover-bg);
+  border-radius: 2px;
+  font-size: 12px;
+}
+
 #gemini-toc-popover {
   position: absolute;
   top: 60px; /* Position below the icon */
