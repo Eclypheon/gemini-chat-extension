@@ -163,19 +163,30 @@ function showTagPopover(chatWindow) {
     popover.classList.remove('hidden');
   }
 
+  // Add outside click listener
+  const handleOutsideClick = (e) => {
+    if (!e.target.closest('#gemini-tag-popover')) {
+      hideTagPopover();
+      document.removeEventListener('mousedown', handleOutsideClick);
+    }
+  };
+  document.addEventListener('mousedown', handleOutsideClick);
+
   // Get current chat ID
   const chatId = location.pathname.split('/').pop();
 
   function updatePopover() {
-    chrome.storage.sync.get('chatTags', (data) => {
+    chrome.storage.sync.get(['chatTags', 'chatNames'], (data) => {
       const chatTags = data.chatTags || {};
+      const chatNames = data.chatNames || {};
       const currentTags = chatTags[chatId] || [];
       const input = popover.querySelector('input');
       if (input) input.value = currentTags.join(', ');
 
       const saveBtn = popover.querySelector('#save-tags');
       if (saveBtn) {
-        saveBtn.onclick = () => {
+        saveBtn.onclick = (e) => {
+          e.stopPropagation();
           const newTags = input.value.split(',').map(t => t.trim()).filter(t => t);
           chatTags[chatId] = newTags;
           chrome.storage.sync.set({ chatTags }, () => {
@@ -186,7 +197,10 @@ function showTagPopover(chatWindow) {
 
       const cancelBtn = popover.querySelector('#cancel-tags');
       if (cancelBtn) {
-        cancelBtn.onclick = updatePopover; // Re-render instead of hide
+        cancelBtn.onclick = (e) => {
+          e.stopPropagation();
+          hideTagPopover();
+        };
       }
 
       // Now list all unique tags
@@ -209,8 +223,34 @@ function showTagPopover(chatWindow) {
         uniqueTags.forEach(tag => {
           const tagDiv = document.createElement('div');
           tagDiv.className = 'tag-item';
-          tagDiv.textContent = tag;
-          tagDiv.onclick = () => {
+
+          const textSpan = document.createElement('span');
+          textSpan.textContent = tag;
+
+          const addSpan = document.createElement('span');
+          addSpan.textContent = '+';
+          addSpan.style.color = 'green';
+          addSpan.style.cursor = 'pointer';
+          addSpan.style.marginLeft = '8px';
+          addSpan.onclick = (e) => {
+            e.stopPropagation();
+            chrome.storage.sync.get('chatTags', (data) => {
+              const updatedChatTags = data.chatTags || {};
+              if (!updatedChatTags[chatId]) updatedChatTags[chatId] = [];
+              if (!updatedChatTags[chatId].includes(tag)) {
+                updatedChatTags[chatId].push(tag);
+                chrome.storage.sync.set({ chatTags: updatedChatTags }, () => {
+                  updatePopover();
+                });
+              }
+            });
+          };
+
+          tagDiv.appendChild(textSpan);
+          tagDiv.appendChild(addSpan);
+
+          tagDiv.onclick = (e) => {
+            e.stopPropagation();
             // Toggle show chats
             if (tagDiv.classList.contains('expanded')) {
               tagDiv.classList.remove('expanded');
@@ -225,7 +265,57 @@ function showTagPopover(chatWindow) {
                 if (chatTags[cId].includes(tag)) {
                   const chatSpan = document.createElement('div');
                   chatSpan.className = 'chat-item';
-                  chatSpan.textContent = `Chat: ${cId}`;
+                  chatSpan.style.cursor = 'pointer';
+
+                  const textSpan = document.createElement('span');
+                  textSpan.textContent = chatNames[cId] || `${cId}`;
+                  textSpan.onclick = () => {
+                    window.location.href = `/u/1/app/${cId}`;
+                  };
+
+                  const removeSpan = document.createElement('span');
+                  removeSpan.textContent = '×';
+                  removeSpan.style.color = 'red';
+                  removeSpan.style.cursor = 'pointer';
+                  removeSpan.style.marginLeft = '8px';
+                  removeSpan.onclick = (e) => {
+                    e.stopPropagation(); // prevent navigating
+                    chrome.storage.sync.get('chatTags', (data) => {
+                      const updatedChatTags = data.chatTags || {};
+                      if (updatedChatTags[cId]) {
+                        updatedChatTags[cId] = updatedChatTags[cId].filter(t => t !== tag);
+                        if (updatedChatTags[cId].length === 0) {
+                          delete updatedChatTags[cId];
+                        }
+                        chrome.storage.sync.set({ chatTags: updatedChatTags }, () => {
+                          chatSpan.remove();
+                        });
+                      }
+                    });
+                  };
+
+                  const pencilSpan = document.createElement('span');
+                  pencilSpan.textContent = '✏️';
+                  pencilSpan.style.cursor = 'pointer';
+                  pencilSpan.style.marginLeft = '8px';
+                  pencilSpan.onclick = (e) => {
+                    e.stopPropagation();
+                    const currentName = chatNames[cId] || cId;
+                    const newName = prompt('Enter a new name for this chat:', currentName);
+                    if (newName !== null && newName.trim() !== '') {
+                      chrome.storage.sync.get('chatNames', (data) => {
+                        const updatedChatNames = data.chatNames || {};
+                        updatedChatNames[cId] = newName.trim();
+                        chrome.storage.sync.set({ chatNames: updatedChatNames }, () => {
+                          textSpan.textContent = newName.trim();
+                        });
+                      });
+                    }
+                  };
+
+                  chatSpan.appendChild(textSpan);
+                  chatSpan.appendChild(removeSpan);
+                  chatSpan.appendChild(pencilSpan);
                   chatListDiv.appendChild(chatSpan);
                 }
               }
