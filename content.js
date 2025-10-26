@@ -152,6 +152,48 @@ function hidePopover() {
   if (icon) icon.classList.remove('active');
 }
 
+function showTagPopover(chatWindow) {
+  let popover = document.getElementById('gemini-tag-popover');
+  if (!popover) {
+    popover = document.createElement('div');
+    popover.id = 'gemini-tag-popover';
+    popover.innerHTML = '<div><input type="text" placeholder="tag1, tag2, tag3" value=""><div class="tag-buttons"><button id="save-tags">Save</button><button id="cancel-tags">Cancel</button></div></div>';
+    chatWindow.appendChild(popover);
+  } else {
+    popover.classList.remove('hidden');
+  }
+
+  // Get current chat ID
+  const chatId = location.pathname.split('/').pop();
+  chrome.storage.sync.get('chatTags', (data) => {
+    const chatTags = data.chatTags || {};
+    const currentTags = chatTags[chatId] || [];
+    const input = popover.querySelector('input');
+    if (input) input.value = currentTags.join(', ');
+
+    const saveBtn = popover.querySelector('#save-tags');
+    if (saveBtn) {
+      saveBtn.onclick = () => {
+        const newTags = input.value.split(',').map(t => t.trim()).filter(t => t);
+        chatTags[chatId] = newTags;
+        chrome.storage.sync.set({ chatTags }, () => {
+          hideTagPopover();
+        });
+      };
+    }
+
+    const cancelBtn = popover.querySelector('#cancel-tags');
+    if (cancelBtn) {
+      cancelBtn.onclick = hideTagPopover;
+    }
+  });
+}
+
+function hideTagPopover() {
+  const popover = document.getElementById('gemini-tag-popover');
+  if (popover) popover.classList.add('hidden');
+}
+
 function initializeUI(chatWindow) {
   if (window.getComputedStyle(chatWindow).position === 'static') {
     chatWindow.style.position = 'relative';
@@ -226,6 +268,26 @@ function initializeUI(chatWindow) {
     e.stopPropagation();
     entryTooltip.hide();
     togglePinState();
+  });
+
+  // --- Second Icon for Tagging ---
+  const tagIcon = document.createElement('div');
+  tagIcon.id = 'gemini-tag-icon';
+  chatWindow.appendChild(tagIcon);
+
+  const tagTooltip = tippy(tagIcon, {
+    content: chrome.i18n.getMessage('tagTooltip'),
+    placement: 'right',
+    animation: 'shift-away-subtle',
+    arrow: false,
+    theme: 'gemini-tooltip',
+    duration: [null, 0],
+  });
+
+  tagIcon.addEventListener('click', (e) => {
+    e.stopPropagation();
+    tagTooltip.hide();
+    showTagPopover(chatWindow);
   });
 
   const observer = new MutationObserver((mutations) => {
