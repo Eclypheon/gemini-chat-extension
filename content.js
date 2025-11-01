@@ -157,7 +157,22 @@ function createTagPopover(chatWindow) {
   if (!popover) {
     popover = document.createElement('div');
     popover.id = 'gemini-tag-popover';
-    popover.innerHTML = '<div><input type="text" placeholder="tag1, tag2, tag3" value=""><div class="tag-buttons"><button id="save-tags">Save</button><button id="cancel-tags">Cancel</button></div><div id="tags-list"></div></div>';
+    popover.innerHTML = `
+      <div class="tag-popover-header">
+        <button id="add-tags-view-btn" class="active">Add Tags</button>
+        <button id="manage-tags-view-btn">Manage Tags</button>
+      </div>
+      <div id="add-tags-view">
+        <input type="text" placeholder="tag1, tag2, tag3" value="">
+        <div class="tag-buttons">
+          <button id="save-tags">Save</button>
+          <button id="cancel-tags">Cancel</button>
+        </div>
+      </div>
+      <div id="manage-tags-view" class="hidden">
+        <div id="tags-list"></div>
+      </div>
+    `;
     chatWindow.appendChild(popover);
   }
   return popover;
@@ -167,48 +182,37 @@ function showTagPopover(chatWindow) {
   const popover = createTagPopover(chatWindow);
   popover.classList.remove('hidden');
 
-function handleTagPopoverOutsideClick(e) {
-  if (!e.target.closest('#gemini-tag-popover')) {
-    hideTagPopover();
-    document.removeEventListener('mousedown', handleTagPopoverOutsideClick);
-  }
-}
+  // Add outside click listener
+  document.addEventListener('mousedown', handleTagPopoverOutsideClick);
+
+  const addTagsViewBtn = popover.querySelector('#add-tags-view-btn');
+  const manageTagsViewBtn = popover.querySelector('#manage-tags-view-btn');
+  const addTagsView = popover.querySelector('#add-tags-view');
+  const manageTagsView = popover.querySelector('#manage-tags-view');
+
+  addTagsViewBtn.onclick = () => {
+    addTagsViewBtn.classList.add('active');
+    manageTagsViewBtn.classList.remove('active');
+    addTagsView.classList.remove('hidden');
+    manageTagsView.classList.add('hidden');
+  };
+
+  manageTagsViewBtn.onclick = () => {
+    manageTagsViewBtn.classList.add('active');
+    addTagsViewBtn.classList.remove('active');
+    manageTagsView.classList.remove('hidden');
+    addTagsView.classList.add('hidden');
+  };
 
   const chatId = getChatId();
 
-  function setupTagButtons(popover, chatId, updateCallback, input, chatTags) {
-    const saveBtn = popover.querySelector('#save-tags');
-    if (saveBtn) {
-      saveBtn.onclick = (e) => {
-        e.stopPropagation();
-        const newTags = input.value.split(',').map(t => t.trim()).filter(t => t);
-        chatTags[chatId] = newTags;
-        chrome.storage.sync.set({ chatTags }, () => {
-          updateCallback();
-        });
-      };
-    }
+  function setupTagButtons(popover, chatId, updateCallback, chatTags) {
+    const addTagsView = popover.querySelector('#add-tags-view');
+    const input = addTagsView.querySelector('input');
+    const saveBtn = addTagsView.querySelector('#save-tags');
+    const cancelBtn = addTagsView.querySelector('#cancel-tags');
 
-    const cancelBtn = popover.querySelector('#cancel-tags');
-    if (cancelBtn) {
-      cancelBtn.onclick = (e) => {
-        e.stopPropagation();
-        hideTagPopover();
-      };
-    }
-  }
-
-  function updatePopover() {
-    chrome.storage.sync.get(['chatTags', 'chatNames'], (data) => {
-      const chatTags = data.chatTags || {};
-      const chatNames = data.chatNames || {};
-      const currentTags = chatTags[chatId] || [];
-      const input = popover.querySelector('input');
-      if (input) input.value = currentTags.join(', ');
-
-      setupTagButtons(popover, chatId, updatePopover, input, chatTags);
-
-      setupTagButtons(popover, chatId, updatePopover, input, chatTags);
+      setupTagButtons(popover, chatId, updatePopover, chatTags);
 
       renderUniqueTagsList(popover, chatTags, chatNames, chatId, updatePopover);
     });
@@ -218,7 +222,8 @@ function handleTagPopoverOutsideClick(e) {
 }
 
 function renderUniqueTagsList(popover, chatTags, chatNames, chatId, updateCallback) {
-  const tagsListDiv = popover.querySelector('#tags-list');
+  const manageTagsView = popover.querySelector('#manage-tags-view');
+  const tagsListDiv = manageTagsView.querySelector('#tags-list');
   if (tagsListDiv) {
     tagsListDiv.innerHTML = '';
 
@@ -233,6 +238,29 @@ function renderUniqueTagsList(popover, chatTags, chatNames, chatId, updateCallba
       tagsListDiv.textContent = 'No tagged chats yet.';
       return;
     }
+
+function renameTagGlobally(oldTag, newTag, chatTags, updateCallback) {
+  const updatedChatTags = { ...chatTags };
+  for (const cId in updatedChatTags) {
+    updatedChatTags[cId] = updatedChatTags[cId].map(t => (t === oldTag ? newTag : t));
+  }
+  chrome.storage.sync.set({ chatTags: updatedChatTags }, () => {
+    updateCallback();
+  });
+}
+
+function deleteTagGlobally(tagToDelete, chatTags, updateCallback) {
+  const updatedChatTags = { ...chatTags };
+  for (const cId in updatedChatTags) {
+    updatedChatTags[cId] = updatedChatTags[cId].filter(t => t !== tagToDelete);
+    if (updatedChatTags[cId].length === 0) {
+      delete updatedChatTags[cId];
+    }
+  }
+  chrome.storage.sync.set({ chatTags: updatedChatTags }, () => {
+    updateCallback();
+  });
+}
 
 function createTagItem(tag, chatTags, chatNames, chatId, updateCallback) {
   const tagDiv = document.createElement('div');
@@ -261,10 +289,35 @@ function createTagItem(tag, chatTags, chatNames, chatId, updateCallback) {
   };
 
   tagDiv.appendChild(textSpan);
-  tagDiv.appendChild(addSpan);
-
-  tagDiv.onclick = (e) => {
-    e.stopPropagation();
+            tagDiv.appendChild(addSpan);
+  
+            const renameSpan = document.createElement('span');
+            renameSpan.textContent = '✏️';
+            renameSpan.style.cursor = 'pointer';
+            renameSpan.style.marginLeft = '8px';
+            renameSpan.onclick = (e) => {
+              e.stopPropagation();
+              const newTagName = prompt('Rename tag:', tag);
+              if (newTagName && newTagName.trim() !== '' && newTagName !== tag) {
+                renameTagGlobally(tag, newTagName.trim(), chatTags, updateCallback);
+              }
+            };
+            tagDiv.appendChild(renameSpan);
+  
+            const deleteSpan = document.createElement('span');
+            deleteSpan.textContent = '×';
+            deleteSpan.style.color = 'red';
+            deleteSpan.style.cursor = 'pointer';
+            deleteSpan.style.marginLeft = '8px';
+            deleteSpan.onclick = (e) => {
+              e.stopPropagation();
+              if (confirm(`Are you sure you want to delete the tag "${tag}" from all chats?`)) {
+                deleteTagGlobally(tag, chatTags, updateCallback);
+              }
+            };
+            tagDiv.appendChild(deleteSpan);
+  
+            tagDiv.onclick = (e) => {    e.stopPropagation();
     // Toggle show chats
     if (tagDiv.classList.contains('expanded')) {
       tagDiv.classList.remove('expanded');
