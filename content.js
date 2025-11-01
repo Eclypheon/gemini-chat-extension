@@ -152,28 +152,51 @@ function hidePopover() {
   if (icon) icon.classList.remove('active');
 }
 
-function showTagPopover(chatWindow) {
+function createTagPopover(chatWindow) {
   let popover = document.getElementById('gemini-tag-popover');
   if (!popover) {
     popover = document.createElement('div');
     popover.id = 'gemini-tag-popover';
     popover.innerHTML = '<div><input type="text" placeholder="tag1, tag2, tag3" value=""><div class="tag-buttons"><button id="save-tags">Save</button><button id="cancel-tags">Cancel</button></div><div id="tags-list"></div></div>';
     chatWindow.appendChild(popover);
-  } else {
-    popover.classList.remove('hidden');
   }
+  return popover;
+}
 
-  // Add outside click listener
-  const handleOutsideClick = (e) => {
-    if (!e.target.closest('#gemini-tag-popover')) {
-      hideTagPopover();
-      document.removeEventListener('mousedown', handleOutsideClick);
+function showTagPopover(chatWindow) {
+  const popover = createTagPopover(chatWindow);
+  popover.classList.remove('hidden');
+
+function handleTagPopoverOutsideClick(e) {
+  if (!e.target.closest('#gemini-tag-popover')) {
+    hideTagPopover();
+    document.removeEventListener('mousedown', handleTagPopoverOutsideClick);
+  }
+}
+
+  const chatId = getChatId();
+
+  function setupTagButtons(popover, chatId, updateCallback, input, chatTags) {
+    const saveBtn = popover.querySelector('#save-tags');
+    if (saveBtn) {
+      saveBtn.onclick = (e) => {
+        e.stopPropagation();
+        const newTags = input.value.split(',').map(t => t.trim()).filter(t => t);
+        chatTags[chatId] = newTags;
+        chrome.storage.sync.set({ chatTags }, () => {
+          updateCallback();
+        });
+      };
     }
-  };
-  document.addEventListener('mousedown', handleOutsideClick);
 
-  // Get current chat ID
-  const chatId = location.pathname.split('/').pop();
+    const cancelBtn = popover.querySelector('#cancel-tags');
+    if (cancelBtn) {
+      cancelBtn.onclick = (e) => {
+        e.stopPropagation();
+        hideTagPopover();
+      };
+    }
+  }
 
   function updatePopover() {
     chrome.storage.sync.get(['chatTags', 'chatNames'], (data) => {
@@ -183,153 +206,91 @@ function showTagPopover(chatWindow) {
       const input = popover.querySelector('input');
       if (input) input.value = currentTags.join(', ');
 
-      const saveBtn = popover.querySelector('#save-tags');
-      if (saveBtn) {
-        saveBtn.onclick = (e) => {
-          e.stopPropagation();
-          const newTags = input.value.split(',').map(t => t.trim()).filter(t => t);
-          chatTags[chatId] = newTags;
-          chrome.storage.sync.set({ chatTags }, () => {
-            updatePopover();
-          });
-        };
-      }
+      setupTagButtons(popover, chatId, updatePopover, input, chatTags);
 
-      const cancelBtn = popover.querySelector('#cancel-tags');
-      if (cancelBtn) {
-        cancelBtn.onclick = (e) => {
-          e.stopPropagation();
-          hideTagPopover();
-        };
-      }
+      setupTagButtons(popover, chatId, updatePopover, input, chatTags);
 
-      // Now list all unique tags
-      const tagsListDiv = popover.querySelector('#tags-list');
-      if (tagsListDiv) {
-        tagsListDiv.innerHTML = '';
-
-        // Get unique tags
-        const allTags = new Set();
-        for (const chats in chatTags) {
-          chatTags[chats].forEach(tag => allTags.add(tag));
-        }
-
-        const uniqueTags = Array.from(allTags);
-        if (uniqueTags.length === 0) {
-          tagsListDiv.textContent = 'No tagged chats yet.';
-          return;
-        }
-
-        uniqueTags.forEach(tag => {
-          const tagDiv = document.createElement('div');
-          tagDiv.className = 'tag-item';
-
-          const textSpan = document.createElement('span');
-          textSpan.textContent = tag;
-
-          const addSpan = document.createElement('span');
-          addSpan.textContent = '+';
-          addSpan.style.color = 'green';
-          addSpan.style.cursor = 'pointer';
-          addSpan.style.marginLeft = '8px';
-          addSpan.onclick = (e) => {
-            e.stopPropagation();
-            chrome.storage.sync.get('chatTags', (data) => {
-              const updatedChatTags = data.chatTags || {};
-              if (!updatedChatTags[chatId]) updatedChatTags[chatId] = [];
-              if (!updatedChatTags[chatId].includes(tag)) {
-                updatedChatTags[chatId].push(tag);
-                chrome.storage.sync.set({ chatTags: updatedChatTags }, () => {
-                  updatePopover();
-                });
-              }
-            });
-          };
-
-          tagDiv.appendChild(textSpan);
-          tagDiv.appendChild(addSpan);
-
-          tagDiv.onclick = (e) => {
-            e.stopPropagation();
-            // Toggle show chats
-            if (tagDiv.classList.contains('expanded')) {
-              tagDiv.classList.remove('expanded');
-              const existingList = tagDiv.querySelector('.chat-list');
-              if (existingList) existingList.remove();
-            } else {
-              tagDiv.classList.add('expanded');
-              const chatListDiv = document.createElement('div');
-              chatListDiv.className = 'chat-list';
-              // Find chats with this tag
-              for (const cId in chatTags) {
-                if (chatTags[cId].includes(tag)) {
-                  const chatSpan = document.createElement('div');
-                  chatSpan.className = 'chat-item';
-                  chatSpan.style.cursor = 'pointer';
-
-                  const textSpan = document.createElement('span');
-                  textSpan.textContent = chatNames[cId] || `${cId}`;
-                  textSpan.onclick = () => {
-                    window.location.href = `/u/1/app/${cId}`;
-                  };
-
-                  const removeSpan = document.createElement('span');
-                  removeSpan.textContent = '×';
-                  removeSpan.style.color = 'red';
-                  removeSpan.style.cursor = 'pointer';
-                  removeSpan.style.marginLeft = '8px';
-                  removeSpan.onclick = (e) => {
-                    e.stopPropagation(); // prevent navigating
-                    chrome.storage.sync.get('chatTags', (data) => {
-                      const updatedChatTags = data.chatTags || {};
-                      if (updatedChatTags[cId]) {
-                        updatedChatTags[cId] = updatedChatTags[cId].filter(t => t !== tag);
-                        if (updatedChatTags[cId].length === 0) {
-                          delete updatedChatTags[cId];
-                        }
-                        chrome.storage.sync.set({ chatTags: updatedChatTags }, () => {
-                          chatSpan.remove();
-                        });
-                      }
-                    });
-                  };
-
-                  const pencilSpan = document.createElement('span');
-                  pencilSpan.textContent = '✏️';
-                  pencilSpan.style.cursor = 'pointer';
-                  pencilSpan.style.marginLeft = '8px';
-                  pencilSpan.onclick = (e) => {
-                    e.stopPropagation();
-                    const currentName = chatNames[cId] || cId;
-                    const newName = prompt('Enter a new name for this chat:', currentName);
-                    if (newName !== null && newName.trim() !== '') {
-                      chrome.storage.sync.get('chatNames', (data) => {
-                        const updatedChatNames = data.chatNames || {};
-                        updatedChatNames[cId] = newName.trim();
-                        chrome.storage.sync.set({ chatNames: updatedChatNames }, () => {
-                          textSpan.textContent = newName.trim();
-                        });
-                      });
-                    }
-                  };
-
-                  chatSpan.appendChild(textSpan);
-                  chatSpan.appendChild(removeSpan);
-                  chatSpan.appendChild(pencilSpan);
-                  chatListDiv.appendChild(chatSpan);
-                }
-              }
-              tagDiv.appendChild(chatListDiv);
-            }
-          };
-          tagsListDiv.appendChild(tagDiv);
-        });
-      }
+      renderUniqueTagsList(popover, chatTags, chatNames, chatId, updatePopover);
     });
   }
 
   updatePopover();
 }
+
+function renderUniqueTagsList(popover, chatTags, chatNames, chatId, updateCallback) {
+  const tagsListDiv = popover.querySelector('#tags-list');
+  if (tagsListDiv) {
+    tagsListDiv.innerHTML = '';
+
+    // Get unique tags
+    const allTags = new Set();
+    for (const chats in chatTags) {
+      chatTags[chats].forEach(tag => allTags.add(tag));
+    }
+
+    const uniqueTags = Array.from(allTags);
+    if (uniqueTags.length === 0) {
+      tagsListDiv.textContent = 'No tagged chats yet.';
+      return;
+    }
+
+function createTagItem(tag, chatTags, chatNames, chatId, updateCallback) {
+  const tagDiv = document.createElement('div');
+  tagDiv.className = 'tag-item';
+
+  const textSpan = document.createElement('span');
+  textSpan.textContent = tag;
+
+  const addSpan = document.createElement('span');
+  addSpan.textContent = '+';
+  addSpan.style.color = 'green';
+  addSpan.style.cursor = 'pointer';
+  addSpan.style.marginLeft = '8px';
+  addSpan.onclick = (e) => {
+    e.stopPropagation();
+    chrome.storage.sync.get('chatTags', (data) => {
+      const updatedChatTags = data.chatTags || {};
+      if (!updatedChatTags[chatId]) updatedChatTags[chatId] = [];
+      if (!updatedChatTags[chatId].includes(tag)) {
+        updatedChatTags[chatId].push(tag);
+        chrome.storage.sync.set({ chatTags: updatedChatTags }, () => {
+          updateCallback();
+        });
+      }
+    });
+  };
+
+  tagDiv.appendChild(textSpan);
+  tagDiv.appendChild(addSpan);
+
+  tagDiv.onclick = (e) => {
+    e.stopPropagation();
+    // Toggle show chats
+    if (tagDiv.classList.contains('expanded')) {
+      tagDiv.classList.remove('expanded');
+      const existingList = tagDiv.querySelector('.chat-list');
+      if (existingList) existingList.remove();
+    } else {
+      tagDiv.classList.add('expanded');
+      const chatListDiv = document.createElement('div');
+      chatListDiv.className = 'chat-list';
+      // Find chats with this tag
+      for (const cId in chatTags) {
+        if (chatTags[cId].includes(tag)) {
+          chatListDiv.appendChild(createChatItem(cId, tag, chatTags, chatNames, updateCallback));
+        }
+      }
+      tagDiv.appendChild(chatListDiv);
+    }
+  };
+  return tagDiv;
+}
+
+    uniqueTags.forEach(tag => {
+      tagsListDiv.appendChild(createTagItem(tag, chatTags, chatNames, chatId, updateCallback));
+    });
+  }
+
 
 function hideTagPopover() {
   const popover = document.getElementById('gemini-tag-popover');
