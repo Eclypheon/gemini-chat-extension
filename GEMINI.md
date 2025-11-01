@@ -43,7 +43,7 @@ To run the extension in a development environment:
 ## Development Conventions
 
 -   **Architecture:** The project's technical architecture is documented in `docs/tech.md`. This file should be considered the source of truth for architectural decisions.
--   **Core Logic:** All of the extension's interactive logic is located in `content.js`. This script is responsible for UI injection, event handling, and DOM manipulation.
+-   **Core Logic:** All of the extension's interactive logic is located in `content.js`. This script is responsible for UI injection, event handling, and DOM manipulation. It includes the implementation of the chat outline and the chat tagging feature.
 -   **Styling:** Styles are defined in `styles.css`. The extension supports both light and dark themes by leveraging CSS variables that respond to the theme of the Gemini website.
 -   **Dependencies:** Third-party libraries (Tippy.js, Popper.js) are included locally in the `vendor/` directory to comply with the website's Content Security Policy (CSP). Development dependencies are managed via `package.json`.
 -   **Commits:** While there is no strict commit message format, aim for clear and descriptive messages that explain the "why" behind the changes.
